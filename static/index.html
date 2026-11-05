@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PortSentinel — PC Security & Port Auditor</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Permission / Consent Modal (Requires User Permission Before First Run) -->
+  <div id="consent-modal" class="modal-backdrop">
+    <div class="modal-card">
+      <div class="modal-badge">
+        <span class="shield-pulse">🛡️</span> Security Consent & Permission
+      </div>
+      <h2>Configure & Authorize PC Audit</h2>
+      <p class="modal-text">
+        To scan open ports, identify active network sockets, and inspect any hidden or 
+        unauthorized <strong>"secret connections"</strong> on this PC, <strong>PortSentinel</strong> 
+        requires explicit authorization.
+      </p>
+      <div class="consent-checklist">
+        <div class="consent-item">
+          <span class="check-icon">✓</span>
+          <div>
+            <strong>100% Local & Private:</strong> No logs, IP addresses, or network data ever leave your machine.
+          </div>
+        </div>
+        <div class="consent-item">
+          <span class="check-icon">✓</span>
+          <div>
+            <strong>Process & Socket Audit:</strong> Maps network connections directly to local executable names (PID inspection).
+          </div>
+        </div>
+        <div class="consent-item">
+          <span class="check-icon">✓</span>
+          <div>
+            <strong>Non-Destructive:</strong> Standard TCP handshake scanning with safe timeouts.
+          </div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button id="btn-grant-consent" class="btn btn-primary btn-glow">
+          <span class="btn-icon">⚡</span> Grant Permission & Launch Audit
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div class="app-layout">
+    <!-- Sidebar Navigation -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          </svg>
+        </div>
+        <div>
+          <h1 class="brand-title">PortSentinel</h1>
+          <span class="brand-subtitle">PC Security Auditor</span>
+        </div>
+      </div>
+
+      <nav class="nav-links">
+        <button class="nav-item active" data-tab="tab-overview">
+          <span class="nav-icon">📊</span> Security Overview
+        </button>
+        <button class="nav-item" data-tab="tab-connections">
+          <span class="nav-icon">🕵️</span> Active & Secret Connections
+          <span id="badge-conn-count" class="counter-badge">0</span>
+        </button>
+        <button class="nav-item" data-tab="tab-scanner">
+          <span class="nav-icon">📡</span> Port Scanner
+        </button>
+        <button class="nav-item" data-tab="tab-guide">
+          <span class="nav-icon">🚀</span> GitHub & Learning Guide
+        </button>
+      </nav>
+
+      <div class="system-card">
+        <div class="system-card-title">Device Environment</div>
+        <div class="system-detail">
+          <span>Host:</span> <strong id="sys-hostname">Detecting...</strong>
+        </div>
+        <div class="system-detail">
+          <span>Local IP:</span> <strong id="sys-ip">127.0.0.1</strong>
+        </div>
+        <div class="system-detail">
+          <span>OS:</span> <strong id="sys-os">Windows</strong>
+        </div>
+        <div class="system-detail">
+          <span>Engine:</span> <strong id="sys-engine">Python 3</strong>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      <!-- Top Action Bar -->
+      <header class="topbar">
+        <div class="topbar-left">
+          <h2 id="view-title">System Security Overview</h2>
+          <p id="view-desc" class="subtext">Real-time health rating, port exposure, and background network traffic.</p>
+        </div>
+        <div class="topbar-actions">
+          <button id="btn-quick-audit" class="btn btn-secondary">
+            <span>🔄</span> Refresh Connections
+          </button>
+          <button id="btn-export-json" class="btn btn-outline">
+            <span>💾</span> Export Audit Report
+          </button>
+        </div>
+      </header>
+
+      <!-- TAB 1: OVERVIEW -->
+      <section id="tab-overview" class="tab-panel active">
+        <!-- Hero Metrics -->
+        <div class="metrics-grid">
+          <div class="metric-card score-card">
+            <div class="metric-header">
+              <span class="metric-label">Security Health Score</span>
+              <span id="score-status-badge" class="badge badge-safe">EXCELLENT</span>
+            </div>
+            <div class="score-display">
+              <div class="score-number" id="security-score">100</div>
+              <div class="score-denom">/ 100</div>
+            </div>
+            <p id="security-summary" class="metric-note">Scanning network interfaces and listening sockets...</p>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-label">Active Connections</div>
+            <div class="metric-value" id="stat-total-conns">0</div>
+            <div class="metric-note">Total active TCP/UDP endpoints</div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-label">Listening Ports</div>
+            <div class="metric-value text-accent" id="stat-listening-ports">0</div>
+            <div class="metric-note">Services waiting for incoming traffic</div>
+          </div>
+
+          <div class="metric-card">
+            <div class="metric-label">Suspicious / Flags</div>
+            <div class="metric-value text-warning" id="stat-flagged-conns">0</div>
+            <div class="metric-note">External or risky endpoints</div>
+          </div>
+        </div>
+
+        <!-- Security Recommendations -->
+        <div class="section-card">
+          <div class="card-header">
+            <h3>🛡️ Security Findings & Action Items</h3>
+          </div>
+          <div id="recommendations-list" class="recs-container">
+            <div class="rec-item info">
+              <span class="rec-icon">💡</span>
+              <div>
+                <strong>Initial Audit Pending:</strong> Run a port scan or click "Refresh Connections" to check for vulnerabilities.
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Listening Ports Table -->
+        <div class="section-card">
+          <div class="card-header">
+            <h3>🎧 Local Listening Sockets (Inbound Doors)</h3>
+            <span class="subtext">Programs currently accepting incoming traffic on this computer</span>
+          </div>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Port</th>
+                  <th>Protocol</th>
+                  <th>Process Name</th>
+                  <th>PID</th>
+                  <th>Risk Rating</th>
+                  <th>Assessment</th>
+                </tr>
+              </thead>
+              <tbody id="overview-listening-tbody">
+                <tr><td colspan="6" class="text-center text-muted">No listening ports recorded yet. Click Refresh.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: ACTIVE & SECRET CONNECTIONS -->
+      <section id="tab-connections" class="tab-panel">
+        <div class="section-card">
+          <div class="card-header flex-between">
+            <div>
+              <h3>🕵️ Active Connections & Process Attribution</h3>
+              <p class="subtext">Inspect every application talking secretly to outside servers or internal networks.</p>
+            </div>
+            <div class="filter-group">
+              <input type="text" id="conn-filter" class="search-input" placeholder="Search by app, IP, or port...">
+              <select id="conn-filter-type" class="select-input">
+                <option value="all">All States</option>
+                <option value="ESTABLISHED">Established (Active)</option>
+                <option value="LISTENING">Listening (Inbound)</option>
+                <option value="SUSPICIOUS">Flagged / Suspicious Only</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Application</th>
+                  <th>PID</th>
+                  <th>Local Endpoint</th>
+                  <th>Remote Endpoint ("Secret Target")</th>
+                  <th>State</th>
+                  <th>Risk Status</th>
+                  <th>Reason / Details</th>
+                </tr>
+              </thead>
+              <tbody id="connections-tbody">
+                <tr><td colspan="7" class="text-center text-muted">Loading network sockets...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: PORT SCANNER -->
+      <section id="tab-scanner" class="tab-panel">
+        <div class="section-card">
+          <div class="card-header">
+            <h3>📡 Port Scanner Configuration</h3>
+            <p class="subtext">Audit TCP ports on this computer or a target address with concurrent worker threads.</p>
+          </div>
+          <div class="scanner-controls">
+            <div class="input-grid">
+              <div class="input-field">
+                <label>Target Host / IP</label>
+                <input type="text" id="scan-target" value="127.0.0.1" class="text-input" placeholder="e.g. 127.0.0.1 or localhost">
+              </div>
+              <div class="input-field">
+                <label>Scan Profile</label>
+                <select id="scan-mode" class="select-input">
+                  <option value="quick">Quick Scan (Top Common Ports)</option>
+                  <option value="all">All Ports (Full 1 - 65,535 Range)</option>
+                  <option value="custom">Custom Port Range</option>
+                </select>
+              </div>
+              <div class="input-field custom-range-field hidden" id="custom-range-box">
+                <label>Port Range (Start - End)</label>
+                <div class="range-inputs">
+                  <input type="number" id="scan-start-port" value="1" min="1" max="65535" class="text-input">
+                  <span>to</span>
+                  <input type="number" id="scan-end-port" value="1024" min="1" max="65535" class="text-input">
+                </div>
+              </div>
+              <div class="input-field">
+                <label>Concurrency (Threads)</label>
+                <select id="scan-concurrency" class="select-input">
+                  <option value="40">40 Threads (Gentle)</option>
+                  <option value="80" selected>80 Threads (Fast / Recommended)</option>
+                  <option value="120">120 Threads (High Speed)</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="scanner-buttons">
+              <button id="btn-start-scan" class="btn btn-primary btn-glow">
+                <span>⚡</span> Start Port Scan
+              </button>
+              <button id="btn-stop-scan" class="btn btn-danger hidden">
+                <span>🛑</span> Cancel Scan
+              </button>
+            </div>
+          </div>
+
+          <!-- Live Progress Box -->
+          <div id="scan-progress-box" class="progress-box hidden">
+            <div class="progress-labels">
+              <div>
+                <strong id="prog-status-text">Scanning in progress...</strong>
+                <span id="prog-details-text" class="subtext">0 / 0 ports scanned</span>
+              </div>
+              <div class="progress-stats">
+                <span id="prog-percent" class="stat-highlight">0%</span>
+                <span id="prog-speed" class="text-muted">(0.0s elapsed)</span>
+              </div>
+            </div>
+            <div class="progress-bar-track">
+              <div id="progress-bar-fill" class="progress-bar-fill" style="width: 0%;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Discovered Open Ports -->
+        <div class="section-card">
+          <div class="card-header flex-between">
+            <div>
+              <h3>🔓 Discovered Open Ports</h3>
+              <p class="subtext">Live list of active TCP listeners detected by the scanner</p>
+            </div>
+            <span id="open-ports-counter" class="badge badge-info">0 Open Ports</span>
+          </div>
+
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Port</th>
+                  <th>Service</th>
+                  <th>Security Risk</th>
+                  <th>Service Description</th>
+                  <th>Banner / HTTP Header</th>
+                </tr>
+              </thead>
+              <tbody id="open-ports-tbody">
+                <tr><td colspan="5" class="text-center text-muted">No scan run yet. Configure above and click "Start Port Scan".</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 4: GITHUB & LEARNING GUIDE -->
+      <section id="tab-guide" class="tab-panel">
+        <div class="section-card">
+          <div class="card-header">
+            <h3>🎓 How This Tool Works & Beginner's Guide to GitHub</h3>
+            <p class="subtext">Master computer networking, port security, and how to publish your code to GitHub cleanly.</p>
+          </div>
+          
+          <div class="guide-content">
+            <div class="guide-step">
+              <div class="step-num">1</div>
+              <div class="step-body">
+                <h4>What is a Port Scanner and how does it work?</h4>
+                <p>
+                  Every computer communicates across a network using <strong>IP addresses</strong> (like your home address) 
+                  and <strong>Ports</strong> (numbered 1 through 65,535, like apartment numbers). 
+                  A port scanner performs a <strong>TCP 3-way handshake</strong>:
+                </p>
+                <div class="code-snippet">
+Client -> [SYN] -> Server
+Server -> [SYN-ACK] (Port is OPEN!)
+Server -> [RST] (Port is CLOSED / OFF)
+                </div>
+                <p>
+                  <strong>PortSentinel</strong> uses Python's non-blocking socket interface with multi-threading to check 
+                  hundreds of ports concurrently in seconds.
+                </p>
+              </div>
+            </div>
+
+            <div class="guide-step">
+              <div class="step-num">2</div>
+              <div class="step-body">
+                <h4>What are "Secret Connections"?</h4>
+                <p>
+                  Malware, spyware, telemetry scripts, or unauthorized background processes often open outbound sockets to remote IP addresses.
+                  PortSentinel inspects the operating system's internal connection table (via <code>netstat</code> and PID resolution) 
+                  to identify the exact <code>.exe</code> process name responsible for each connection.
+                </p>
+              </div>
+            </div>
+
+            <div class="guide-step">
+              <div class="step-num">3</div>
+              <div class="step-body">
+                <h4>How to Publish This Project to GitHub (Step-by-Step)</h4>
+                <p>Follow these exact steps in your terminal to create your first repository on GitHub:</p>
+                
+                <h5>A. Install Git (if not installed yet)</h5>
+                <p>Download from <a href="https://git-scm.com/download/win" target="_blank">git-scm.com</a> or run:</p>
+                <div class="code-snippet">winget install --id Git.Git -e --source winget</div>
+
+                <h5>B. Set up your Git Identity</h5>
+                <div class="code-snippet">
+git config --global user.name "Your Name"
+git config --global user.email "your.email@example.com"
+                </div>
+
+                <h5>C. Initialize the Project Repository</h5>
+                <div class="code-snippet">
+cd C:\Users\satwi\.gemini\antigravity\scratch\port-sentinel
+git init
+git add .
+git commit -m "Initial commit: PortSentinel PC Security & Port Auditor"
+                </div>
+
+                <h5>D. Create a Repository on GitHub and Push</h5>
+                <ol class="guide-list">
+                  <li>Go to <a href="https://github.com/new" target="_blank">github.com/new</a>.</li>
+                  <li>Name the repository <code>port-sentinel</code> (leave "Initialize with README" unchecked).</li>
+                  <li>Copy the commands shown on GitHub and run them:</li>
+                </ol>
+                <div class="code-snippet">
+git branch -M main
+git remote add origin https://github.com/YOUR_USERNAME/port-sentinel.git
+git push -u origin main
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
